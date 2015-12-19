@@ -8,7 +8,6 @@ services:
     - docker
 
 script:
-  - ls
   - ./build.sh
     
 after_success:
