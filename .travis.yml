@@ -1,0 +1,16 @@
+sudo: required
+
+language: go
+go:
+  - 1.5
+
+services:
+    - docker
+
+script:
+  - ls
+  - ./build.sh
+    
+after_success:
+  - docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD" -e="$DOCKER_EMAIL"
+  - docker push openservice/acl-database:latest
