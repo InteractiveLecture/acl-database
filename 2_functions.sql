@@ -9,6 +9,24 @@ with recursive p(id,level,path,object_class,parent_object) as (
 ) select id,level,object_class,path,parent_object from p;
 $$ LANGUAGE sql;
 
+drop function insert_bulk_permissions(UUID,boolean,boolean,boolean,boolean,UUID[])
+CREATE OR REPLACE function insert_bulk_permissions(in_oid UUID,in_create_permission boolean,in_read_permission boolean,in_update_permission boolean,in_delete_permission boolean,variadic in_sids UUID[]) RETURNS void AS $$
+  insert into acl_entries(object_id,sid,create_permission,read_permission,update_permission,delete_permission) 
+  select in_oid, sid , in_create_permission, in_read_permission, in_update_permission, in_delete_permission  from unnest(in_sids) AS sid;
+$$ LANGUAGE  sql;
+
+drop function delete_objects(in_oids UUID[])
+CREATE OR REPLACE function delete_objects(VARIADIC in_oids UUID[]) RETURNS void AS $$
+delete from object_identities where id in (select oid from unnest(in_oids) as oid);
+$$ LANGUAGE  sql;
+
+
+drop function insert_bulk_sid_permissions(UUID,boolean,boolean,boolean,boolean,UUID[])
+CREATE OR REPLACE function insert_bulk_sid_permissions(in_sid UUID,in_create_permission boolean,in_read_permission boolean,in_update_permission boolean,in_delete_permission boolean,variadic in_oids UUID[]) RETURNS void AS $$
+  insert into acl_entries(object_id,sid,create_permission,read_permission,update_permission,delete_permission) 
+  select oid, in_sid , in_create_permission, in_read_permission, in_update_permission, in_delete_permission  from unnest(in_oids) AS oid;
+$$ LANGUAGE  sql;
+
 drop function get_permissions(UUID,UUID);
 drop type permission;
 create type permission as (
