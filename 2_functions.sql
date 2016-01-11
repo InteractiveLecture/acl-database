@@ -12,9 +12,19 @@ $$ LANGUAGE sql;
 
 drop function insert_bulk_permissions(UUID,boolean,boolean,boolean,boolean,UUID[]);
 CREATE OR REPLACE function insert_bulk_permissions(in_oid UUID,in_create_permission boolean,in_read_permission boolean,in_update_permission boolean,in_delete_permission boolean,variadic in_sids UUID[]) RETURNS void AS $$
-insert into acl_entries(object_id,sid,create_permission,read_permission,update_permission,delete_permission)
-  select in_oid, sid , in_create_permission, in_read_permission, in_update_permission, in_delete_permission  from unnest(in_sids) AS sid;
-$$ LANGUAGE  sql;
+DECLARE
+tmp_id UUID;
+BEGIN
+  FOREACH tmp_id in ARRAY in_sids LOOP
+    insert into acl_entries(object_id,sid,create_permission,read_permission,update_permission,delete_permission)
+      select in_oid, asid , in_create_permission, in_read_permission, in_update_permission, in_delete_permission  
+      from unnest(in_sids) AS asid
+    on conflict (object_id, sid) do 
+    update set read_permission = in_read_permission, update_permission = in_update_permission, delete_permission = in_delete_permission, create_permission = in_create_permission 
+  where acl_entries.object_id = in_oid AND acl_entries.sid = tmp_id;
+END LOOP; 
+END;
+$$ LANGUAGE  plpgsql;
 
 drop function delete_objects(in_oids UUID[]);
 CREATE OR REPLACE function delete_objects(VARIADIC in_oids UUID[]) RETURNS void AS $$
@@ -24,9 +34,18 @@ $$ LANGUAGE  sql;
 
 drop function insert_bulk_sid_permissions(UUID,boolean,boolean,boolean,boolean,UUID[]);
 CREATE OR REPLACE function insert_bulk_sid_permissions(in_sid UUID,in_create_permission boolean,in_read_permission boolean,in_update_permission boolean,in_delete_permission boolean,variadic in_oids UUID[]) RETURNS void AS $$
-  insert into acl_entries(object_id,sid,create_permission,read_permission,update_permission,delete_permission) 
-  select oid, in_sid , in_create_permission, in_read_permission, in_update_permission, in_delete_permission  from unnest(in_oids) AS oid;
-$$ LANGUAGE  sql;
+DECLARE
+tmp_id UUID;
+BEGIN
+  FOREACH tmp_id in ARRAY in_oids LOOP
+    insert into acl_entries(object_id,sid,create_permission,read_permission,update_permission,delete_permission) 
+      select oid, in_sid , in_create_permission, in_read_permission, in_update_permission, in_delete_permission  
+      from unnest(in_oids) AS oid
+    on conflict (object_id, sid) do update set read_permission = in_read_permission, update_permission = in_update_permission, delete_permission = in_delete_permission, create_permission = in_create_permission 
+    where acl_entries.object_id = tmp_id AND acl_entries.sid = in_sid;
+  END LOOP;
+END;
+$$ LANGUAGE  plpgsql;
 
 drop function get_permissions(UUID,UUID);
 drop type permission;
@@ -65,8 +84,8 @@ BEGIN
     IF tmp.delete_permission THEN
       result.delete_permission = true;
     END IF;
-END LOOP;
-return to_json(result);
-END;
-$$ LANGUAGE plpgsql;
+    END LOOP;
+    return to_json(result);
+    END;
+    $$ LANGUAGE plpgsql;
 
