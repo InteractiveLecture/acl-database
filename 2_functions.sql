@@ -1,27 +1,28 @@
+\c acl
 drop function get_parent_tree(UUID);
 CREATE OR REPLACE FUNCTION get_parent_tree(in_id UUID) 
-RETURNS table(id UUID, level int, object_class varchar(500), path text ,parent_object UUID) AS $$
-with recursive p(id,level,path,object_class,parent_object) as (
-  select id,0, '/'||id ,object_class , parent_object from object_identities where id = in_id
+RETURNS table(id UUID, level int, path text ,parent_object UUID) AS $$
+with recursive p(id,level,path,parent_object) as (
+  select id,0, '/'||id , parent_object from object_identities where id = in_id
   union
-  select o.id,p.level+1, p.path || '/' || o.id, o.object_class,o.parent_object 
+  select o.id,p.level+1, p.path || '/' || o.id, o.parent_object 
   from object_identities o inner join p on p.parent_object = o.id
-) select id,level,object_class,path,parent_object from p;
+) select id,level,path,parent_object from p;
 $$ LANGUAGE sql;
 
-drop function insert_bulk_permissions(UUID,boolean,boolean,boolean,boolean,UUID[])
+drop function insert_bulk_permissions(UUID,boolean,boolean,boolean,boolean,UUID[]);
 CREATE OR REPLACE function insert_bulk_permissions(in_oid UUID,in_create_permission boolean,in_read_permission boolean,in_update_permission boolean,in_delete_permission boolean,variadic in_sids UUID[]) RETURNS void AS $$
-  insert into acl_entries(object_id,sid,create_permission,read_permission,update_permission,delete_permission) 
+insert into acl_entries(object_id,sid,create_permission,read_permission,update_permission,delete_permission)
   select in_oid, sid , in_create_permission, in_read_permission, in_update_permission, in_delete_permission  from unnest(in_sids) AS sid;
 $$ LANGUAGE  sql;
 
-drop function delete_objects(in_oids UUID[])
+drop function delete_objects(in_oids UUID[]);
 CREATE OR REPLACE function delete_objects(VARIADIC in_oids UUID[]) RETURNS void AS $$
 delete from object_identities where id in (select oid from unnest(in_oids) as oid);
 $$ LANGUAGE  sql;
 
 
-drop function insert_bulk_sid_permissions(UUID,boolean,boolean,boolean,boolean,UUID[])
+drop function insert_bulk_sid_permissions(UUID,boolean,boolean,boolean,boolean,UUID[]);
 CREATE OR REPLACE function insert_bulk_sid_permissions(in_sid UUID,in_create_permission boolean,in_read_permission boolean,in_update_permission boolean,in_delete_permission boolean,variadic in_oids UUID[]) RETURNS void AS $$
   insert into acl_entries(object_id,sid,create_permission,read_permission,update_permission,delete_permission) 
   select oid, in_sid , in_create_permission, in_read_permission, in_update_permission, in_delete_permission  from unnest(in_oids) AS oid;
