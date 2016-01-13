@@ -11,7 +11,7 @@ create table object_identities (
 );
 
 create table acl_entries (
-  object_id UUID not null references object_identities(id),
+  object_id UUID not null references object_identities(id) on delete cascade,
   sid UUID not null,
   create_permission boolean not null,
   read_permission boolean not null,
